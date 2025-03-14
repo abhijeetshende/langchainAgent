@@ -1,11 +1,9 @@
 import os
-import datetime
 import uuid
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, String, Enum, JSON
+from sqlalchemy import create_engine, Column, String, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.dialects.postgresql import UUID
 
 # Load environment variables
 load_dotenv()
@@ -21,18 +19,14 @@ ORG_TYPES = ("PARTNER", "CUSTOMER", "RAMEN")
 class Organization(Base):
     __tablename__ = "organizations"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False, index=True)
+    name = Column(String, primary_key=True)  # Using org_name as primary key
     org_type = Column(Enum(*ORG_TYPES, name="org_type_enum"), nullable=False)
     super_admin_email = Column(String, nullable=False)
     status = Column(String, nullable=True)  # ACTIVE, CREATED, INACTIVE
     reg_address = Column(String, nullable=True)
     description = Column(String, nullable=True)
-    logo_id = Column(String, nullable=True)
-    org_stats = Column(JSON, nullable=True)
-    hierarchy = Column(JSON, nullable=True)  # For nested structures
 
-Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)  # Ensure table creation
 
 
 
@@ -56,8 +50,6 @@ def create_organization(input_str: str, *args, **kwargs):
             status=status.strip(),
             reg_address=reg_address.strip() if reg_address else None,
             description=description.strip() if description else None,
-            org_stats={},  # Empty stats initially
-            hierarchy=[],  # Empty hierarchy initially
         )
         session.add(org)
         session.commit()
@@ -70,10 +62,10 @@ def create_organization(input_str: str, *args, **kwargs):
         session.close()
 
 
-def fetch_organizations(*args, **kwargs):
+def fetch_organizations(input_str: str = "", *args, **kwargs):
     """
-    Fetch all organizations in a hierarchical structure.
-    Returns a newline-separated list of organization IDs and names.
+    Fetch all organizations.
+    Accepts an optional empty input.
     """
     session = SessionLocal()
     try:
@@ -81,43 +73,38 @@ def fetch_organizations(*args, **kwargs):
         if not orgs:
             return "No organizations found."
 
-        # Return IDs in a simple, parseable format
-        return "\n".join([f"{org.id}|{org.name}" for org in orgs])
+        return "\n".join([f"{org.name}|{org.org_type}" for org in orgs])
     
     finally:
         session.close()
 
 
-def update_organization(input_str: str, *args, **kwargs):
+def update_organization_address(input_str: str, *args, **kwargs):
     """
-    Updates an organization.
-    Expected input format: id|name|org_type|super_admin_email|status|reg_address|description
+    Updates the address of an organization.
+    Expected input format: "update address of <org_name> to <new_address>"
     """
     session = None
     try:
-        parts = input_str.split("|")
-        if len(parts) != 7:
-            return "Invalid input format. Use: id|name|org_type|super_admin_email|status|reg_address|description"
-        
-        org_id, name, org_type, super_admin_email, status, reg_address, description = parts
+        parts = input_str.split(" to ")
+        if len(parts) != 2:
+            return "Invalid input format. Use: update address of <org_name> to <new_address>"
+
+        org_name = parts[0].replace("update address of", "").strip()
+        new_address = parts[1].strip()
+
         session = SessionLocal()
-        org = session.query(Organization).filter(Organization.id == uuid.UUID(org_id.strip())).first()
-        
+        org = session.query(Organization).filter(Organization.name == org_name).first()
+
         if not org:
-            return f"Organization with ID {org_id} not found."
-        
-        org.name = name.strip()
-        org.org_type = org_type.strip()
-        org.super_admin_email = super_admin_email.strip()
-        org.status = status.strip()
-        org.reg_address = reg_address.strip() if reg_address else None
-        org.description = description.strip() if description else None
-        
+            return f"Organization '{org_name}' not found."
+
+        org.reg_address = new_address
         session.commit()
-        return f"Organization '{org.name}' updated."
+        return f"Updated address of '{org_name}' to '{new_address}'."
     
     except Exception as e:
-        return f"Error updating organization: {str(e)}"
+        return f"Error updating address: {str(e)}"
     
     finally:
         if session:
