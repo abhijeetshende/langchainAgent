@@ -47,6 +47,7 @@ agent_executor = AgentExecutor.from_agent_and_tools(
     agent=agent,
     tools=tools,
     verbose=True,
+    handle_parsing_errors=True,
 )
 
 def run_agent(input_text: str) -> str:
