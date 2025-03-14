@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Virtual environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables
+.env
+
+# Docker
+docker-compose.override.yml
+*.log
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+
+# Vite
+.vite/
+
+# Miscellaneous
+.DS_Store
