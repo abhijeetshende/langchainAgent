@@ -101,46 +101,49 @@ def fetch_sites_by_org(org_name: str, *args, **kwargs):
         if not sites:
             return f"No sites found for Organization '{org_name}'."
 
-        return "\n".join([f"{site.id}|{site.name}|{site.street_address}" for site in sites])
+        return "\n".join([f"{site.name}|{site.street_address or 'N/A'}" for site in sites])
     
     finally:
         session.close()
 
-
 def update_site(input_str: str, *args, **kwargs):
     """
-    Updates a site.
-    Expected input format: site_id|name|description|street_address
+    Updates a site's details using its name.
+    Expected input format: site_name|[new_name]|[description]|[street_address]|[org_name]
+    Fields in brackets [] are optional.
     """
-    session = None
+    session = SessionLocal()
     try:
         parts = input_str.split("|")
-        if len(parts) < 2:
-            return "Invalid format. Use: site_id|name|description|street_address"
-        
-        site_id, name = parts[0].strip(), parts[1].strip()
-        description = parts[2].strip() if len(parts) > 2 else None
-        street_address = parts[3].strip() if len(parts) > 3 else None
+        site_name = parts[0].strip() if len(parts) > 0 else ""
 
-        session = SessionLocal()
-        site = session.query(Site).filter(Site.id == site_id).first()
-        
+        if not site_name:
+            return "Invalid input: Site name is required."
+
+        site = session.query(Site).filter(Site.name.ilike(site_name)).first()
         if not site:
-            return f"Site with ID {site_id} not found."
+            return f"Site with name '{site_name}' not found."
 
-        site.name = name
-        site.description = description
-        site.street_address = street_address
+        # Define updatable fields (ensuring correct update of `org_name`)
+        field_names = ["name", "description", "street_address", "org_name"]
+        updates = {field_names[i]: parts[i + 1].strip() for i in range(len(parts) - 1) if parts[i + 1].strip()}
+
+        # Prevent unintentional renaming of site unless explicitly provided
+        if "name" in updates and updates["name"] == site_name:
+            del updates["name"]  # Ignore same-name updates
+
+        # Apply updates dynamically
+        for field, value in updates.items():
+            setattr(site, field, value)
 
         session.commit()
-        return f"Site '{site.name}' updated."
-    
+        return f"Site '{site.name}' updated successfully with changes: {updates}"
+
     except Exception as e:
         return f"Error updating site: {str(e)}"
-    
+
     finally:
-        if session:
-            session.close()
+        session.close()
 
 
 def delete_site(input_str: str, *args, **kwargs):
@@ -148,23 +151,23 @@ def delete_site(input_str: str, *args, **kwargs):
     Deletes a site by name.
     Expected input: site_name
     """
-    session = None
+    session = SessionLocal()
     try:
         site_name = input_str.strip()
 
-        session = SessionLocal()
-        site = session.query(Site).filter(Site.name == site_name).first()
-        
+        if not site_name:
+            return "Invalid input: Site name is required."
+
+        site = session.query(Site).filter(Site.name.ilike(site_name)).first()
         if not site:
             return f"Site with name '{site_name}' not found."
 
         session.delete(site)
         session.commit()
-        return f"Site '{site.name}' deleted."
+        return f"Site '{site_name}' deleted successfully."
     
     except Exception as e:
         return f"Error deleting site: {str(e)}"
     
     finally:
-        if session:
-            session.close()
+        session.close()

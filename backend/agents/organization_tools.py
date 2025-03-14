@@ -1,9 +1,8 @@
-import os
-import uuid
-from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, String, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import os
+from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
@@ -19,9 +18,9 @@ ORG_TYPES = ("PARTNER", "CUSTOMER", "RAMEN")
 class Organization(Base):
     __tablename__ = "organizations"
 
-    name = Column(String, primary_key=True)  # Using org_name as primary key
-    org_type = Column(Enum(*ORG_TYPES, name="org_type_enum"), nullable=False)
-    super_admin_email = Column(String, nullable=False)
+    name = Column(String, primary_key=True)  # Name as primary key
+    org_type = Column(Enum(*ORG_TYPES, name="org_type_enum"), nullable=True)
+    super_admin_email = Column(String, nullable=True)
     status = Column(String, nullable=True)  # ACTIVE, CREATED, INACTIVE
     reg_address = Column(String, nullable=True)
     description = Column(String, nullable=True)
@@ -32,40 +31,33 @@ Base.metadata.create_all(bind=engine)  # Ensure table creation
 
 def create_organization(input_str: str, *args, **kwargs):
     """
-    Creates an organization.
-    Expected input format: name|org_type|super_admin_email|status|reg_address|description
+    Creates an organization with just a name.
+    Expected input format: name
     """
+    session = SessionLocal()
     try:
-        parts = input_str.split("|")
-        if len(parts) != 6:
-            return "Invalid input format. Use: name|org_type|super_admin_email|status|reg_address|description"
-        
-        name, org_type, super_admin_email, status, reg_address, description = parts
-        session = SessionLocal()
-        
-        org = Organization(
-            name=name.strip(),
-            org_type=org_type.strip(),
-            super_admin_email=super_admin_email.strip(),
-            status=status.strip(),
-            reg_address=reg_address.strip() if reg_address else None,
-            description=description.strip() if description else None,
-        )
+        name = input_str.strip()
+        if not name:
+            return "Invalid input: Organization name cannot be empty."
+
+        existing_org = session.query(Organization).filter(Organization.name == name).first()
+        if existing_org:
+            return f"Organization '{name}' already exists."
+
+        org = Organization(name=name)
         session.add(org)
         session.commit()
-        return f"Organization '{name}' created with ID {org.id}."
-    
+        return f"Organization '{name}' created successfully."
+
     except Exception as e:
         return f"Error creating organization: {str(e)}"
-    
+
     finally:
         session.close()
-
 
 def fetch_organizations(input_str: str = "", *args, **kwargs):
     """
     Fetch all organizations.
-    Accepts an optional empty input.
     """
     session = SessionLocal()
     try:
@@ -73,74 +65,70 @@ def fetch_organizations(input_str: str = "", *args, **kwargs):
         if not orgs:
             return "No organizations found."
 
-        return "\n".join([f"{org.name}|{org.org_type}" for org in orgs])
-    
+        return "\n".join([f"{org.name} | {org.org_type or 'N/A'} | {org.status or 'N/A'}" for org in orgs])
+
     finally:
         session.close()
 
-
-def update_organization_address(input_str: str, *args, **kwargs):
+def update_organization(input_str: str, *args, **kwargs):
     """
-    Updates the address of an organization.
-    Expected input format: "update address of <org_name> to <new_address>"
+    Updates an organization's details.
+    Expected input format: name|[org_type]|[super_admin_email]|[status]|[reg_address]|[description]
+    Fields in brackets [] are optional.
     """
-    session = None
+    session = SessionLocal()
     try:
-        parts = input_str.split(" to ")
-        if len(parts) != 2:
-            return "Invalid input format. Use: update address of <org_name> to <new_address>"
+        parts = input_str.split("|")
+        name = parts[0].strip() if parts else ""
 
-        org_name = parts[0].replace("update address of", "").strip()
-        new_address = parts[1].strip()
+        if not name:
+            return "Invalid input: Organization name is required."
 
-        session = SessionLocal()
-        org = session.query(Organization).filter(Organization.name == org_name).first()
-
+        org = session.query(Organization).filter(Organization.name == name).first()
         if not org:
-            return f"Organization '{org_name}' not found."
+            return f"Organization '{name}' not found."
 
-        org.reg_address = new_address
+        # Define updatable fields and map them to the input
+        field_names = ["org_type", "super_admin_email", "status", "reg_address", "description"]
+        updates = {field_names[i]: parts[i + 1].strip() for i in range(len(parts) - 1) if parts[i + 1].strip()}
+
+        # Apply updates dynamically
+        for field, value in updates.items():
+            setattr(org, field, value)
+
         session.commit()
-        return f"Updated address of '{org_name}' to '{new_address}'."
-    
+        return f"Organization '{name}' updated successfully with changes: {updates}"
+
     except Exception as e:
-        return f"Error updating address: {str(e)}"
-    
+        return f"Error updating organization: {str(e)}"
+
     finally:
-        if session:
-            session.close()
+        session.close()
 
 
 import uuid
 
 def delete_organization(input_str: str, *args, **kwargs):
     """
-    Deletes an organization by ID.
-    Expects input format: org_id
+    Deletes an organization by name.
+    Expected input format: name
     """
-    session = None
+    session = SessionLocal()
     try:
-        org_id = input_str.strip()
-        
-        # Validate UUID format
-        try:
-            uuid_obj = uuid.UUID(org_id)
-        except ValueError:
-            return f"Invalid UUID format: {org_id}"
+        name = input_str.strip()
+        if not name:
+            return "Invalid input: Organization name cannot be empty."
 
-        session = SessionLocal()
-        org = session.query(Organization).filter(Organization.id == uuid_obj).first()
-        
+        org = session.query(Organization).filter(Organization.name == name).first()
         if not org:
-            return f"Organization with ID {org_id} not found."
-        
+            return f"Organization '{name}' not found."
+
         session.delete(org)
         session.commit()
-        return f"Organization with ID {org_id} deleted successfully."
-    
+        return f"Organization '{name}' deleted successfully."
+
     except Exception as e:
         return f"Error deleting organization: {str(e)}"
-    
+
     finally:
-        if session:
-            session.close()
+        session.close()

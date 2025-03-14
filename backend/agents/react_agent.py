@@ -19,7 +19,7 @@ from .todo_tools import fetch_todos, get_today_todo, create_todo, update_todo, d
 from agents.organization_tools import (
     create_organization, 
     fetch_organizations, 
-    update_organization_address, 
+    update_organization, 
     delete_organization
 )
 
@@ -83,22 +83,22 @@ tools.extend([
     Tool(
         name="CreateOrganization",
         func=create_organization,
-        description="Create an organization. Input format: name|org_type|super_admin_email|status|reg_address|description"
+        description="Create an organization with just a name. Input format: name"
     ),
     Tool(
         name="FetchOrganizations",
-        func=fetch_organizations,
-        description="Fetch all organizations in a hierarchical structure. Pass an empty string as input."
+        func=lambda _: fetch_organizations(""),  # Explicitly passing an empty string
+        description="Fetch all organizations. No input required."
     ),
     Tool(
         name="UpdateOrganization",
-        func=update_organization_address,
-        description="Update an organization's address. Input format: update address of <org_name> to <new_address>"
+        func=update_organization,
+        description="Update an organization’s details using its name. Input format: name|[org_type]|[super_admin_email]|[status]|[reg_address]|[description]. Fields in brackets [] are optional."
     ),
     Tool(
         name="DeleteOrganization",
         func=delete_organization,
-        description="Delete an organization by ID."
+        description="Delete an organization by name. Input format: name"
     ),
 ])
 
@@ -106,23 +106,22 @@ tools.extend([
     Tool(
         name="CreateSite",
         func=create_site,
-        description="Create a site under an organization using its name. Input: org_name|name|description|street_address"
+        description="Create a site under an organization using its name. Input format: org_name|site_name|[description]|[street_address]"
     ),
     Tool(
         name="FetchSites",
-        func=fetch_sites,
-        description="Fetch all sites. No input required."
-
+        func=lambda _: fetch_sites(""),  # Ensures an empty input is passed
+        description="Fetch all sites. Pass an empty string as input."
     ),
     Tool(
         name="FetchSitesByOrg",
         func=fetch_sites_by_org,
-        description="Fetch all sites under a specific organization using its name. Input: org_name"
+        description="Fetch all sites under a specific organization using its name. Input format: org_name"
     ),
     Tool(
         name="UpdateSite",
         func=update_site,
-        description="Update a site. Input: site_id|name|description|street_address"
+        description="Update a site's details using its name. Input format: site_name|[new_name]|[description]|[street_address]. Fields in brackets [] are optional."
     ),
     Tool(
         name="DeleteSite",
@@ -130,6 +129,7 @@ tools.extend([
         description="Delete a site by name. Input format: site_name"
     ),
 ])
+
 
 # ----------------------------
 # Setup the Agent
