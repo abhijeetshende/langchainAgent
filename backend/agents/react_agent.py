@@ -16,6 +16,14 @@ load_dotenv()
 
 # Import tools from the extracted todo module
 from .todo_tools import fetch_todos, get_today_todo, create_todo, update_todo, delete_todo
+from agents.organization_tools import (
+    create_organization, 
+    fetch_organizations, 
+    update_organization, 
+    delete_organization
+)
+
+
 
 # ----------------------------
 # Define General Tools
@@ -62,6 +70,30 @@ tools = [
         description="Delete a todo item by id. Input: id"
     ),
 ]
+
+
+tools.extend([
+    Tool(
+        name="CreateOrganization",
+        func=create_organization,
+        description="Create an organization. Input format: name|org_type|super_admin_email|status|reg_address|description"
+    ),
+    Tool(
+        name="FetchOrganizations",
+        func=fetch_organizations,
+        description="Fetch all organizations in a hierarchical structure. No input required."
+    ),
+    Tool(
+        name="UpdateOrganization",
+        func=update_organization,
+        description="Update an organization. Input format: id|name|org_type|super_admin_email|status|reg_address|description"
+    ),
+    Tool(
+        name="DeleteOrganization",
+        func=delete_organization,
+        description="Delete an organization by ID."
+    ),
+])
 
 # ----------------------------
 # Setup the Agent
